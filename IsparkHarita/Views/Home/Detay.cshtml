@@ -1,0 +1,201 @@
+@model IsparkHarita.Models.OtoparkDetay
+
+@{
+    ViewData["Title"] = Model.locationName + " - Otopark Detayı";
+    ViewData["Description"] = Model.locationName + " otopark bilgileri: " + Model.district + " ilçesinde, " + Model.capacity + " kapasiteli, " + Model.emptyCapacity + " boş alan mevcut.";
+}
+
+<div class="detail-container">
+    <div class="detail-content">
+        <div class="detail-sidebar">
+            <div class="detail-card">
+                <div class="detail-header">
+                    <div class="detail-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                    </div>
+                    <h1 class="detail-title">@Model.locationName</h1>
+                </div>
+
+                <div class="detail-body">
+                    <div class="detail-info-group">
+                        <div class="info-item">
+                            <span class="info-label">İlçe</span>
+                            <span class="info-value">@Model.district</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Adres</span>
+                            <span class="info-value">@Model.address</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Çalışma Saatleri</span>
+                            <span class="info-value">@Model.workHours</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.tariff))
+                        {
+                            <div class="info-item">
+                                <span class="info-label">Ücret Tarifesi</span>
+                                <div class="tariff-list">
+                                    @{
+                                        var tariffParts = Model.tariff.Split(';');
+                                        foreach (var part in tariffParts)
+                                        {
+                                            if (!string.IsNullOrWhiteSpace(part))
+                                            {
+                                                var tariffItem = part.Trim();
+                                                <div class="tariff-item">@tariffItem</div>
+                                            }
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                        @if (Model.monthlyFee != null && int.TryParse(Model.monthlyFee.ToString(), out int monthlyFeeValue))
+                        {
+                            <div class="info-item">
+                                <span class="info-label">Aylık Ücret</span>
+                                <span class="info-value">@monthlyFeeValue.ToString("N0") TL</span>
+                            </div>
+                        }
+                        @if (Model.freeTime != null && int.TryParse(Model.freeTime.ToString(), out int freeTimeValue))
+                        {
+                            <div class="info-item">
+                                <span class="info-label">Ücretsiz Süre</span>
+                                <span class="info-value">@freeTimeValue Dakika</span>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="detail-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Kapasite</span>
+                            <span class="stat-value">@Model.capacity</span>
+                        </div>
+                        <div class="stat-item @(Model.emptyCapacity == 0 ? "stat-item-danger" : "stat-item-success")">
+                            <span class="stat-label">Boş Alan</span>
+                            <span class="stat-value">@Model.emptyCapacity</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-footer">
+                    <div class="detail-footer-buttons">
+                        <a href="/Home/Harita" class="detail-back-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m12 19-7-7 7-7"></path>
+                                <path d="M19 12H5"></path>
+                            </svg>
+                            Haritaya Dön
+                        </a>
+                        <a href="@($"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(Model.locationName + " " + Model.address)}")" target="_blank" class="detail-maps-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            Maps'de Aç
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-map-container">
+            <div id="detailMap" class="detail-map"></div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/wicket/wicket.js"></script>
+
+<script>
+    // 1. Haritayı hazırla
+    var lat = @Model.lat.Replace(',', '.');
+    var lng = @Model.lng.Replace(',', '.');
+    var map = L.map('detailMap').setView([lat, lng], 17);
+
+    // Dark mode kontrolü
+    function getCurrentTheme() {
+        return document.documentElement.getAttribute('data-theme') || 'light';
+    }
+
+    // Tile layer'ı tema'ya göre ayarla
+    var lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
+    var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    });
+
+    // İlk tile layer'ı ekle
+    if (getCurrentTheme() === 'dark') {
+        darkTileLayer.addTo(map);
+    } else {
+        lightTileLayer.addTo(map);
+    }
+
+    // Tema değiştiğinde tile layer'ı güncelle
+    var observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+                var theme = getCurrentTheme();
+                if (theme === 'dark') {
+                    map.removeLayer(lightTileLayer);
+                    darkTileLayer.addTo(map);
+                } else {
+                    map.removeLayer(darkTileLayer);
+                    lightTileLayer.addTo(map);
+                }
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+    // 2. Merkezi işaretle
+    L.marker([lat, lng]).addTo(map).bindPopup("Otopark Girişi/Merkezi");
+
+    // 3. Poligon Verisini İşle
+    var rawWkt = "@Html.Raw(Model.areaPolygon)";
+
+    if (rawWkt && rawWkt.includes("POLYGON")) {
+        try {
+            // WKT içindeki koordinatları ayıklayalım: ((29.09 41.02, ...))
+            // Önce POLYGON (( ve )) kısımlarını temizleyelim
+            var cleanCoords = rawWkt.replace("POLYGON ((", "").replace("))", "");
+            var coordPairs = cleanCoords.split(","); // Virgülle ayrılmış çiftleri al
+            
+            var latlngs = [];
+            coordPairs.forEach(function(pair) {
+                var parts = pair.trim().split(" "); // "29.09 41.02" -> [29.09, 41.02]
+                if (parts.length === 2) {
+                    // DİKKAT: WKT'de sıra [Boylam, Enlem] şeklindedir. 
+                    // Leaflet ise [Enlem, Boylam] bekler. Yerlerini değiştiriyoruz.
+                    var pLng = parseFloat(parts[0]);
+                    var pLat = parseFloat(parts[1]);
+                    latlngs.push([pLat, pLng]);
+                }
+            });
+
+            // 4. Poligonu Çiz
+            var polygon = L.polygon(latlngs, {
+                color: '#2563eb',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.2,
+                weight: 3
+            }).addTo(map);
+
+            // 5. Haritayı poligona odakla
+            map.fitBounds(polygon.getBounds());
+            
+            console.log("Poligon başarıyla çizildi!");
+        } catch (e) {
+            console.error("Poligon ayrıştırma hatası: ", e);
+        }
+    } else {
+        console.warn("Geçerli poligon verisi bulunamadı.");
+    }
+</script>

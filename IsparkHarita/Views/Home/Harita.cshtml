@@ -1,0 +1,603 @@
+@model List<IsparkHarita.Models.Otopark>
+@{
+    ViewData["Title"] = "Harita";
+    ViewData["Description"] = "İstanbul Büyükşehir Belediyesi otopark haritası. " + Model.Count + " otopark konumu, kapasite bilgileri ve boş alan durumları.";
+}
+
+<div class="app-container">
+    <div class="content-wrapper">
+        <aside class="sidebar" id="sidebar">
+            <button class="sidebar-close" id="sidebarClose">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div class="sidebar-header">
+                <div class="logo-area">
+                    <i data-lucide="list" class="logo-icon"></i>
+                    <span class="logo-text">Otopark Listesi</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-text">@Model.Count Nokta Aktif</span>
+                </div>
+            </div>
+
+            <div class="search-box">
+                <div class="search-input-container">
+                    <div class="input-wrapper">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="searchInput" class="custom-input" placeholder="Otopark adına göre ara...">
+                    </div>
+                    <button class="filter-toggle-icon" id="filterToggle" aria-label="Filtrele">
+                        <i data-lucide="filter" class="filter-icon"></i>
+                    </button>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-panel" id="filterPanel">
+                        <div class="filter-group">
+                            <label class="filter-label">Boş Alan Durumu</label>
+                            <select id="emptyStatusFilter" class="filter-select">
+                                <option value="all">Tümü</option>
+                                <option value="available">Yer Var</option>
+                                <option value="full">Dolu</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Kapasite Aralığı</label>
+                            <select id="capacityFilter" class="filter-select">
+                                <option value="all">Tümü</option>
+                                <option value="small">Küçük (&lt;50)</option>
+                                <option value="medium">Orta (50-199)</option>
+                                <option value="large">Büyük (200-499)</option>
+                                <option value="xlarge">Çok Büyük (≥500)</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Boşluk Oranı</label>
+                            <select id="emptyRateFilter" class="filter-select">
+                                <option value="all">Tümü</option>
+                                <option value="high">Yüksek (%50+)</option>
+                                <option value="medium">Orta (%20-50)</option>
+                                <option value="low">Düşük (%0-20)</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">İlçe</label>
+                            <select id="districtFilter" class="filter-select">
+                                <option value="all">Tümü</option>
+                            </select>
+                        </div>
+                        <button class="filter-clear" id="clearFilters">Filtreleri Temizle</button>
+                        <p class="filter-info">
+                            Boş alan verileri İBB API'sinden alınmaktadır. Harita ve detay sayfası arasında anlık boş alan farkları görülebilir; bu durum İBB veri senkronizasyonundan kaynaklanabilir.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-results-container">
+                <div class="filter-chips" id="filterChips"></div>
+                <div class="filter-results-count" id="filterResultsCount"></div>
+            </div>
+
+            <div class="park-list" id="parkList">
+                @foreach (var park in Model)
+                {
+                    <div class="park-item" data-name="@park.parkName.ToLower()" data-capacity="@park.capacity" data-empty="@park.emptyCapacity" data-district="@(park.district?.ToLower() ?? "")" data-parkid="@park.parkID" onclick="focusMap([@park.lat.Replace(',', '.'), @park.lng.Replace(',', '.')], @park.parkID)" style="cursor: pointer;">
+                        <div class="park-header">
+                            <h3 class="park-name">@park.parkName</h3>
+                            <a href="/Home/Detay/@park.parkID" class="park-detail-btn" onclick="event.stopPropagation();">
+                                Detay →
+                            </a>
+                        </div>
+                        <div class="park-footer">
+                            <div class="park-stats">
+                                <span class="stat-item-inline">Kapasite: <strong>@park.capacity</strong></span>
+                                <span class="stat-item-inline @(park.emptyCapacity == 0 ? "stat-empty" : "stat-available")">
+                                    Boş: <strong>@park.emptyCapacity</strong>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </aside>
+
+        <main id="map"></main>
+        <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
+            <span class="icon-open">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </span>
+            <span class="icon-close">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </span>
+        </button>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script>
+    lucide.createIcons();
+
+    // 1. Haritayı Başlat
+    var map = L.map('map', { 
+        zoomControl: false,
+        attributionControl: false 
+    }).setView([41.0082, 28.9784], 11);
+
+    // Dark mode kontrolü
+    function getCurrentTheme() {
+        return document.documentElement.getAttribute('data-theme') || 'light';
+    }
+
+    // Tile layer'ı tema'ya göre ayarla
+    var lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    });
+
+    var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxZoom: 19
+    });
+
+    // İlk tile layer'ı ekle
+    if (getCurrentTheme() === 'dark') {
+        darkTileLayer.addTo(map);
+    } else {
+        lightTileLayer.addTo(map);
+    }
+
+    // Tema değiştiğinde tile layer'ı güncelle
+    var observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+                var theme = getCurrentTheme();
+                if (theme === 'dark') {
+                    map.removeLayer(lightTileLayer);
+                    darkTileLayer.addTo(map);
+                } else {
+                    map.removeLayer(darkTileLayer);
+                    lightTileLayer.addTo(map);
+                }
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+    // BUG ÇÖZÜMÜ: Harita yüklendikten sonra boyutu tekrar hesapla
+    setTimeout(function(){ map.invalidateSize(); }, 200);
+
+    var markers = L.markerClusterGroup({ showCoverageOnHover: false });
+    var markerMap = new Map(); // parkID -> marker mapping
+    
+    @foreach (var park in Model)
+    {
+        var isEmpty = park.emptyCapacity == 0;
+        var colorClass = isEmpty ? "popup-empty" : "popup-available";
+        var colorText = isEmpty ? "#ef4444" : "#10b981";
+        <text>
+        var marker = L.marker([@park.lat.Replace(',', '.'), @park.lng.Replace(',', '.')]);
+        var popupContent = `
+            <div class="map-popup-content">
+                <b style="display: block; margin-bottom: 8px;">@park.parkName</b>
+                <div style="margin-bottom: 8px;">
+                    <span style="color: @colorText; font-weight: 600;">Boş: @park.emptyCapacity</span>
+                </div>
+                <a href="/Home/Detay/@park.parkID" style="
+                    display: inline-block;
+                    padding: 6px 12px;
+                    background: #2563eb;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    margin-top: 4px;
+                ">Detay Görüntüle →</a>
+            </div>
+        `;
+        marker.bindPopup(popupContent);
+        markers.addLayer(marker);
+        markerMap.set(@park.parkID, marker);
+        </text>
+    }
+    map.addLayer(markers);
+
+    // 2. Haritaya Odaklanma Fonksiyonu ve Popup Açma
+    function focusMap(coords, parkId) {
+        map.setView(coords, 16);
+        // Marker'ı bul ve popup'ı aç
+        setTimeout(function() {
+            var marker = markerMap.get(parkId);
+            if (marker) {
+                marker.openPopup();
+            }
+        }, 300);
+    }
+
+    // 3. FİLTRELEME VE ARAMA FONKSİYONLARI
+    // Constants
+    var CAPACITY_RANGES = {
+        small: { min: 0, max: 49, label: 'Kapasite: <50' },
+        medium: { min: 50, max: 199, label: 'Kapasite: 50-199' },
+        large: { min: 200, max: 499, label: 'Kapasite: 200-499' },
+        xlarge: { min: 500, max: Infinity, label: 'Kapasite: ≥500' }
+    };
+
+    var EMPTY_RATE_RANGES = {
+        high: { min: 50, max: 100, label: 'Boşluk: Yüksek' },
+        medium: { min: 20, max: 49, label: 'Boşluk: Orta' },
+        low: { min: 0, max: 19, label: 'Boşluk: Düşük' }
+    };
+
+    var EMPTY_STATUS_LABELS = {
+        available: 'Boş: Yer Var',
+        full: 'Boş: Dolu'
+    };
+
+    // DOM element cache
+    var elements = {
+        searchInput: document.getElementById('searchInput'),
+        emptyStatusFilter: document.getElementById('emptyStatusFilter'),
+        capacityFilter: document.getElementById('capacityFilter'),
+        emptyRateFilter: document.getElementById('emptyRateFilter'),
+        districtFilter: document.getElementById('districtFilter'),
+        filterChips: document.getElementById('filterChips'),
+        filterResultsCount: document.getElementById('filterResultsCount'),
+        filterPanel: document.getElementById('filterPanel'),
+        filterToggle: document.getElementById('filterToggle'),
+        clearFilters: document.getElementById('clearFilters'),
+        sidebar: document.getElementById('sidebar'),
+        sidebarToggle: document.getElementById('sidebarToggleMobile'),
+        sidebarClose: document.getElementById('sidebarClose')
+    };
+
+    // District dropdown'ını doldur
+    function populateDistrictFilter() {
+        if (!elements.districtFilter) return;
+        
+        var districts = new Set();
+        var items = document.querySelectorAll('.park-item');
+        items.forEach(function(item) {
+            var district = item.getAttribute('data-district');
+            if (district && district.trim() !== '') {
+                districts.add(district);
+            }
+        });
+        
+        var sortedDistricts = Array.from(districts).sort();
+        sortedDistricts.forEach(function(district) {
+            var option = document.createElement('option');
+            option.value = district;
+            option.textContent = district.charAt(0).toUpperCase() + district.slice(1);
+            elements.districtFilter.appendChild(option);
+        });
+    }
+
+    function updateEmptyRateState() {
+        if (!elements.emptyRateFilter) return;
+        
+        var emptyStatus = elements.emptyStatusFilter.value;
+        var isDisabled = emptyStatus === 'full';
+        
+        elements.emptyRateFilter.disabled = isDisabled;
+        elements.emptyRateFilter.value = isDisabled ? 'all' : elements.emptyRateFilter.value;
+        
+        if (isDisabled) {
+            elements.emptyRateFilter.classList.add('filter-select-disabled');
+        } else {
+            elements.emptyRateFilter.classList.remove('filter-select-disabled');
+        }
+    }
+
+    function createFilterChip(label, onClear) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'filter-chip';
+        chip.innerHTML = '<span>' + label + '</span><span class="chip-close">×</span>';
+        chip.addEventListener('click', function(e) {
+            e.stopPropagation(); // Sidebar'ın kapanmasını engelle
+            onClear();
+        });
+        return chip;
+    }
+
+    function renderFilterChips() {
+        if (!elements.filterChips) return;
+        
+        elements.filterChips.innerHTML = '';
+
+        var emptyStatus = elements.emptyStatusFilter.value;
+        var capacityRange = elements.capacityFilter.value;
+        var emptyRate = elements.emptyRateFilter.value;
+        var district = elements.districtFilter.value;
+
+        // Boş alan durumu chip'i
+        if (emptyStatus !== 'all' && EMPTY_STATUS_LABELS[emptyStatus]) {
+            var chip = createFilterChip(EMPTY_STATUS_LABELS[emptyStatus], function () {
+                elements.emptyStatusFilter.value = 'all';
+                updateEmptyRateState();
+                applyFilters();
+            });
+            elements.filterChips.appendChild(chip);
+        }
+
+        // Kapasite chip'i
+        if (capacityRange !== 'all' && CAPACITY_RANGES[capacityRange]) {
+            var chip = createFilterChip(CAPACITY_RANGES[capacityRange].label, function () {
+                elements.capacityFilter.value = 'all';
+                applyFilters();
+            });
+            elements.filterChips.appendChild(chip);
+        }
+
+        // Boşluk oranı chip'i
+        if (emptyRate !== 'all' && emptyStatus !== 'full' && EMPTY_RATE_RANGES[emptyRate]) {
+            var chip = createFilterChip(EMPTY_RATE_RANGES[emptyRate].label, function () {
+                elements.emptyRateFilter.value = 'all';
+                applyFilters();
+            });
+            elements.filterChips.appendChild(chip);
+        }
+
+        // İlçe chip'i
+        if (district !== 'all' && district) {
+            var districtLabel = district.charAt(0).toUpperCase() + district.slice(1);
+            var chip = createFilterChip('İlçe: ' + districtLabel, function () {
+                elements.districtFilter.value = 'all';
+                applyFilters();
+            });
+            elements.filterChips.appendChild(chip);
+        }
+    }
+
+    function matchesSearchFilter(name, searchTerm) {
+        return name.includes(searchTerm);
+    }
+
+    function matchesEmptyStatusFilter(empty, emptyStatus) {
+        if (emptyStatus === 'all') return true;
+        if (emptyStatus === 'available') return empty > 0;
+        if (emptyStatus === 'full') return empty === 0;
+        return true;
+    }
+
+    function matchesCapacityFilter(capacity, capacityRange) {
+        if (capacityRange === 'all') return true;
+        var range = CAPACITY_RANGES[capacityRange];
+        if (!range) return true;
+        return capacity >= range.min && capacity <= range.max;
+    }
+
+    function matchesEmptyRateFilter(empty, capacity, emptyRate) {
+        if (emptyRate === 'all' || capacity === 0) return true;
+        var emptyPercentage = (empty / capacity) * 100;
+        var range = EMPTY_RATE_RANGES[emptyRate];
+        if (!range) return true;
+        return emptyPercentage >= range.min && emptyPercentage <= range.max;
+    }
+
+    function matchesDistrictFilter(district, selectedDistrict) {
+        if (selectedDistrict === 'all' || !selectedDistrict) return true;
+        return district && district.toLowerCase() === selectedDistrict.toLowerCase();
+    }
+
+    function saveFilterState() {
+        var filterState = {
+            search: elements.searchInput.value,
+            emptyStatus: elements.emptyStatusFilter.value,
+            capacityRange: elements.capacityFilter.value,
+            emptyRate: elements.emptyRateFilter.value,
+            district: elements.districtFilter.value
+        };
+        localStorage.setItem('isparkFilterState', JSON.stringify(filterState));
+    }
+
+    function loadFilterState() {
+        try {
+            var savedState = localStorage.getItem('isparkFilterState');
+            if (savedState) {
+                var filterState = JSON.parse(savedState);
+                if (elements.searchInput) elements.searchInput.value = filterState.search || '';
+                if (elements.emptyStatusFilter) elements.emptyStatusFilter.value = filterState.emptyStatus || 'all';
+                if (elements.capacityFilter) elements.capacityFilter.value = filterState.capacityRange || 'all';
+                if (elements.emptyRateFilter) elements.emptyRateFilter.value = filterState.emptyRate || 'all';
+                if (elements.districtFilter) elements.districtFilter.value = filterState.district || 'all';
+                return true;
+            }
+        } catch (e) {
+            console.error('Filter state load error:', e);
+        }
+        return false;
+    }
+
+    function applyFilters() {
+        var searchTerm = elements.searchInput.value.toLowerCase();
+        var emptyStatus = elements.emptyStatusFilter.value;
+        var capacityRange = elements.capacityFilter.value;
+        var emptyRate = elements.emptyRateFilter.value;
+        var district = elements.districtFilter.value;
+
+        // Filtre durumunu kaydet
+        saveFilterState();
+
+        updateEmptyRateState();
+        renderFilterChips();
+        
+        var items = document.querySelectorAll('.park-item');
+        var visibleParkIds = [];
+        var visibleCount = 0;
+        
+        items.forEach(function(item) {
+            var name = item.getAttribute('data-name');
+            var capacity = parseInt(item.getAttribute('data-capacity'), 10);
+            var empty = parseInt(item.getAttribute('data-empty'), 10);
+            var parkDistrict = item.getAttribute('data-district');
+            var parkId = parseInt(item.getAttribute('data-parkid'), 10);
+            
+            var matches = 
+                matchesSearchFilter(name, searchTerm) &&
+                matchesEmptyStatusFilter(empty, emptyStatus) &&
+                matchesCapacityFilter(capacity, capacityRange) &&
+                matchesEmptyRateFilter(empty, capacity, emptyRate) &&
+                matchesDistrictFilter(parkDistrict, district);
+            
+            if (matches) {
+                item.style.display = 'block';
+                visibleParkIds.push(parkId);
+                visibleCount++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        
+        updateResultsCount(visibleCount, items.length);
+        updateMapMarkers(visibleParkIds);
+    }
+
+    function updateMapMarkers(visibleParkIds) {
+        markers.clearLayers();
+        visibleParkIds.forEach(function(parkId) {
+            var marker = markerMap.get(parkId);
+            if (marker) {
+                markers.addLayer(marker);
+            }
+        });
+    }
+
+    function updateResultsCount(visible, total) {
+        var countElement = document.getElementById('filterResultsCount');
+        if (!countElement) return;
+        
+        if (visible === total) {
+            countElement.textContent = total + ' otopark bulundu';
+        } else {
+            countElement.textContent = visible + ' / ' + total + ' otopark bulundu';
+        }
+    }
+
+    // Event Listeners
+    function initializeEventListeners() {
+        // Arama input
+        if (elements.searchInput) {
+            elements.searchInput.addEventListener('input', applyFilters);
+        }
+        
+        // Filtre değişiklikleri
+        if (elements.emptyStatusFilter) {
+            elements.emptyStatusFilter.addEventListener('change', function () {
+                updateEmptyRateState();
+                applyFilters();
+            });
+        }
+        
+        if (elements.capacityFilter) {
+            elements.capacityFilter.addEventListener('change', applyFilters);
+        }
+        
+        if (elements.emptyRateFilter) {
+            elements.emptyRateFilter.addEventListener('change', applyFilters);
+        }
+        
+        if (elements.districtFilter) {
+            elements.districtFilter.addEventListener('change', applyFilters);
+        }
+        
+        // Filtreleri temizle
+        if (elements.clearFilters) {
+            elements.clearFilters.addEventListener('click', function() {
+                elements.searchInput.value = '';
+                elements.emptyStatusFilter.value = 'all';
+                elements.capacityFilter.value = 'all';
+                elements.emptyRateFilter.value = 'all';
+                elements.districtFilter.value = 'all';
+                localStorage.removeItem('isparkFilterState');
+                updateEmptyRateState();
+                applyFilters();
+            });
+        }
+        
+        // Filtre panel toggle
+        if (elements.filterToggle && elements.filterPanel) {
+            elements.filterToggle.addEventListener('click', function() {
+                elements.filterPanel.classList.toggle('active');
+            });
+        }
+        
+        // Mobil sidebar toggle
+        if (elements.sidebar && elements.sidebarToggle) {
+            elements.sidebarToggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                var isActive = elements.sidebar.classList.contains('active');
+                elements.sidebar.classList.toggle('active');
+                elements.sidebarToggle.classList.toggle('active', !isActive);
+            });
+        }
+        
+        // Sidebar close button
+        if (elements.sidebar && elements.sidebarClose) {
+            elements.sidebarClose.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                elements.sidebar.classList.remove('active');
+                if (elements.sidebarToggle) {
+                    elements.sidebarToggle.classList.remove('active');
+                }
+            });
+        }
+        
+        // Sidebar dışına tıklayınca kapat
+        if (elements.sidebar) {
+            document.addEventListener('click', function(e) {
+                var isMobile = window.innerWidth <= 768;
+                var isSidebarActive = elements.sidebar.classList.contains('active');
+                var clickedOutside = !elements.sidebar.contains(e.target) && 
+                                     elements.sidebarToggle && 
+                                     !elements.sidebarToggle.contains(e.target);
+                
+                if (isMobile && isSidebarActive && clickedOutside) {
+                    elements.sidebar.classList.remove('active');
+                    if (elements.sidebarToggle) {
+                        elements.sidebarToggle.classList.remove('active');
+                    }
+                }
+            });
+        }
+    }
+
+    // Initialize
+    initializeEventListeners();
+    
+    // District dropdown'ını doldur
+    populateDistrictFilter();
+
+    // Sayfa yüklendiğinde kaydedilmiş filtre durumunu geri yükle
+    var hasLoadedState = loadFilterState();
+    updateEmptyRateState();
+    
+    // Eğer kaydedilmiş durum varsa filtreleri uygula, yoksa sadece chipleri ve sonuç sayısını göster
+    if (hasLoadedState) {
+        applyFilters();
+    } else {
+        renderFilterChips();
+        updateResultsCount(@Model.Count, @Model.Count);
+    }
+</script>
+

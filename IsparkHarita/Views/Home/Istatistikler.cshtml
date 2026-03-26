@@ -1,0 +1,240 @@
+@model List<IsparkHarita.Models.Otopark>
+
+@{
+    ViewData["Title"] = "İstatistikler";
+    ViewData["Description"] = "İBB otopark istatistikleri: " + Model.Count + " otopark, toplam " + Model.Sum(p => p.capacity).ToString("N0") + " kapasite, doluluk oranları ve detaylı analizler.";
+    
+    var totalParks = Model.Count;
+    var totalCapacity = Model.Sum(p => p.capacity);
+    var totalEmpty = Model.Sum(p => p.emptyCapacity);
+    var totalOccupied = totalCapacity - totalEmpty;
+    var occupancyRate = totalCapacity > 0 ? (double)totalOccupied / totalCapacity * 100 : 0;
+    var parksWithSpace = Model.Count(p => p.emptyCapacity > 0);
+    var parksFull = Model.Count(p => p.emptyCapacity == 0);
+    var avgCapacity = totalParks > 0 ? (double)totalCapacity / totalParks : 0;
+    var avgEmpty = totalParks > 0 ? (double)totalEmpty / totalParks : 0;
+    var maxCapacity = Model.Max(p => p.capacity);
+    var minCapacity = Model.Min(p => p.capacity);
+    var parksWithHighCapacity = Model.Count(p => p.capacity > avgCapacity);
+}
+
+<div class="stats-container">
+    <div class="stats-header">
+        <h1 class="stats-title">İBB Otopark İstatistikleri</h1>
+        <p class="stats-subtitle">Güncel otopark verileri ve analizleri</p>
+    </div>
+
+    <div class="stats-grid">
+        <!-- Ana İstatistikler -->
+        <div class="stat-card stat-card-primary">
+            <div class="stat-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+            </div>
+            <div class="stat-card-content">
+                <span class="stat-card-label">Toplam Otopark</span>
+                <span class="stat-card-value">@totalParks</span>
+            </div>
+        </div>
+
+        <div class="stat-card stat-card-success">
+            <div class="stat-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                </svg>
+            </div>
+            <div class="stat-card-content">
+                <span class="stat-card-label">Toplam Kapasite</span>
+                <span class="stat-card-value">@totalCapacity.ToString("N0")</span>
+            </div>
+        </div>
+
+        <div class="stat-card stat-card-info">
+            <div class="stat-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </div>
+            <div class="stat-card-content">
+                <span class="stat-card-label">Boş Alan</span>
+                <span class="stat-card-value">@totalEmpty.ToString("N0")</span>
+            </div>
+        </div>
+
+        <div class="stat-card stat-card-warning">
+            <div class="stat-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <div class="stat-card-content">
+                <span class="stat-card-label">Dolu Alan</span>
+                <span class="stat-card-value">@totalOccupied.ToString("N0")</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Oranlar ve Detaylar -->
+    <div class="stats-section">
+        <div class="ratio-grid">
+            <div class="ratio-card">
+                <div class="ratio-header">
+                    <span class="ratio-label">Doluluk Oranı</span>
+                    <span class="ratio-value">@occupancyRate.ToString("F1")%</span>
+                </div>
+                <div class="ratio-bar">
+                    <div class="ratio-bar-fill ratio-bar-occupied" style="width: @occupancyRate.ToString("F1")%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Durum Analizi -->
+    <div class="stats-section">
+        <h2 class="section-title">Durum Analizi</h2>
+        <div class="analysis-grid">
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-success">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@parksWithSpace</span>
+                    <span class="analysis-label">Yer Bulunan Otopark</span>
+                </div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-danger">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@parksFull</span>
+                    <span class="analysis-label">Dolu Otopark</span>
+                </div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-info">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@avgCapacity.ToString("F0")</span>
+                    <span class="analysis-label">Ortalama Kapasite</span>
+                </div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-warning">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@avgEmpty.ToString("F0")</span>
+                    <span class="analysis-label">Ortalama Boş Alan</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kapasite Dağılımı -->
+    <div class="stats-section">
+        <h2 class="section-title">Kapasite Dağılımı</h2>
+        <div class="capacity-chart">
+            @{
+                var smallParks = Model.Count(p => p.capacity < 50);
+                var mediumParks = Model.Count(p => p.capacity >= 50 && p.capacity < 200);
+                var largeParks = Model.Count(p => p.capacity >= 200 && p.capacity < 500);
+                var xlargeParks = Model.Count(p => p.capacity >= 500);
+            }
+            <div class="chart-item">
+                <div class="chart-bar-container">
+                    <div class="chart-bar" style="height: @((double)smallParks / totalParks * 100)%"></div>
+                </div>
+                <span class="chart-label">Küçük<br/>(&lt;50)</span>
+                <span class="chart-value">@smallParks</span>
+            </div>
+            <div class="chart-item">
+                <div class="chart-bar-container">
+                    <div class="chart-bar" style="height: @((double)mediumParks / totalParks * 100)%"></div>
+                </div>
+                <span class="chart-label">Orta<br/>(50-199)</span>
+                <span class="chart-value">@mediumParks</span>
+            </div>
+            <div class="chart-item">
+                <div class="chart-bar-container">
+                    <div class="chart-bar" style="height: @((double)largeParks / totalParks * 100)%"></div>
+                </div>
+                <span class="chart-label">Büyük<br/>(200-499)</span>
+                <span class="chart-value">@largeParks</span>
+            </div>
+            <div class="chart-item">
+                <div class="chart-bar-container">
+                    <div class="chart-bar" style="height: @((double)xlargeParks / totalParks * 100)%"></div>
+                </div>
+                <span class="chart-label">Çok Büyük<br/>(≥500)</span>
+                <span class="chart-value">@xlargeParks</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ek İstatistikler -->
+    <div class="stats-section">
+        <h2 class="section-title">Ek İstatistikler</h2>
+        <div class="analysis-grid">
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-success">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1"></path>
+                        <polyline points="12 15 17 21 7 21 12 15"></polyline>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@maxCapacity.ToString("N0")</span>
+                    <span class="analysis-label">En Yüksek Kapasite</span>
+                </div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-info">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@minCapacity</span>
+                    <span class="analysis-label">En Düşük Kapasite</span>
+                </div>
+            </div>
+            <div class="analysis-card">
+                <div class="analysis-icon analysis-icon-warning">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                </div>
+                <div class="analysis-content">
+                    <span class="analysis-value">@parksWithHighCapacity</span>
+                    <span class="analysis-label">Ortalamanın Üstünde</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
